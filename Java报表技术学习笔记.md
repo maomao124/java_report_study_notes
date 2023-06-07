@@ -4827,3 +4827,664 @@ public class JavaReportEasypoiImportAndExportExcelApplication
 
 ## 模板方式导出数据
 
+模板是处理复杂Excel的简单方法，复杂的Excel样式，可以用Excel直接编辑，完美的避开了代码编写样式的雷区，同时指令的支持
+
+模板方式采用的写法是{{}}代表表达式，然后根据表达式里面的数据取值，easypoi不会改变excel原有的样式
+
+
+
+模板如下：
+
+![image-20230607142046094](img/Java报表技术学习笔记/image-20230607142046094.png)
+
+
+
+
+
+```java
+package mao.java_report_easypoi_import_and_export_excel.service;
+
+import com.baomidou.mybatisplus.extension.service.IService;
+import mao.java_report_easypoi_import_and_export_excel.entity.User;
+
+/**
+ * Project name(项目名称)：java_report_easypoi_import_and_export_excel
+ * Package(包名): mao.java_report_easypoi_import_and_export_excel.service
+ * Interface(接口名): UserService
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2023/6/6
+ * Time(创建时间)： 22:30
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public interface UserService extends IService<User>
+{
+    /**
+     * 下载excel
+     */
+    void download();
+
+    /**
+     * 导入excel
+     */
+    void importExcel();
+
+    /**
+     * 通过模板导出excel
+     */
+    void downLoadWithTemplate();
+}
+```
+
+
+
+```java
+package mao.java_report_easypoi_import_and_export_excel.service.impl;
+
+import cn.afterturn.easypoi.excel.ExcelExportUtil;
+import cn.afterturn.easypoi.excel.ExcelImportUtil;
+import cn.afterturn.easypoi.excel.entity.ExportParams;
+import cn.afterturn.easypoi.excel.entity.ImportParams;
+import cn.afterturn.easypoi.excel.entity.TemplateExportParams;
+import cn.afterturn.easypoi.excel.entity.enmus.ExcelType;
+import cn.hutool.core.bean.BeanUtil;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import lombok.extern.slf4j.Slf4j;
+import mao.java_report_easypoi_import_and_export_excel.entity.User;
+import mao.java_report_easypoi_import_and_export_excel.mapper.UserMapper;
+import mao.java_report_easypoi_import_and_export_excel.service.UserService;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.springframework.beans.BeanUtils;
+import org.springframework.stereotype.Service;
+
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
+
+/**
+ * Project name(项目名称)：java_report_easypoi_import_and_export_excel
+ * Package(包名): mao.java_report_easypoi_import_and_export_excel.service.impl
+ * Class(类名): UserServiceImpl
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2023/6/6
+ * Time(创建时间)： 22:30
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+@Slf4j
+@Service
+public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService
+{
+
+    @Override
+    public void download()
+    {
+        log.info("开始导出");
+        //只导出前5万条
+        IPage<User> page = new Page<>(0, 50000);
+        List<User> userList = this.page(page).getRecords();
+        //指定导出的格式是高版本的格式
+        ExportParams exportParams = new ExportParams("员工信息", "数据", ExcelType.XSSF);
+        //直接使用EasyPOI提供的方法
+        Workbook workbook = ExcelExportUtil.exportExcel(exportParams, User.class, userList);
+        try (FileOutputStream fileOutputStream = new FileOutputStream("./out.xlsx"))
+        {
+            workbook.write(fileOutputStream);
+            workbook.close();
+            log.info("导出完成");
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void importExcel()
+    {
+        log.info("开始导入excel");
+        try (FileInputStream fileInputStream = new FileInputStream("./out.xlsx"))
+        {
+            ImportParams importParams = new ImportParams();
+            //有多少行的标题
+            importParams.setTitleRows(1);
+            //有多少行的头
+            importParams.setHeadRows(1);
+            //导入
+            List<User> userList = ExcelImportUtil.importExcel(fileInputStream, User.class, importParams);
+            //打印
+            userList.forEach(user -> log.info(user.toString()));
+            log.info("导入完成");
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+        }
+    }
+
+
+    @Override
+    public void downLoadWithTemplate()
+    {
+        log.info("开始导出");
+
+        try (FileOutputStream fileOutputStream = new FileOutputStream("./out3.xlsx"))
+        {
+            TemplateExportParams params = new TemplateExportParams("./template.xlsx", true);
+
+            User user = this.getById(1);
+            //hutools工具类
+            Map<String, Object> map = BeanUtil.beanToMap(user);
+            //转换
+            Workbook workbook = ExcelExportUtil.exportExcel(params, map);
+            workbook.write(fileOutputStream);
+            workbook.close();
+            log.info("导出完成");
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+
+
+```java
+package mao.java_report_easypoi_import_and_export_excel;
+
+import mao.java_report_easypoi_import_and_export_excel.service.UserService;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.ConfigurableApplicationContext;
+
+@SpringBootApplication
+public class JavaReportEasypoiImportAndExportExcelApplication
+{
+
+    public static void main(String[] args)
+    {
+        ConfigurableApplicationContext context = SpringApplication.run(JavaReportEasypoiImportAndExportExcelApplication.class, args);
+        UserService userService = context.getBean(UserService.class);
+        userService.download();
+        userService.importExcel();
+        userService.downLoadWithTemplate();
+    }
+
+}
+```
+
+
+
+
+
+效果：
+
+![image-20230607142150710](img/Java报表技术学习笔记/image-20230607142150710.png)
+
+
+
+
+
+
+
+
+
+
+
+## 导出CSV
+
+csv的导出基本上和excel的导出一致，大体参数也是一致的
+
+CsvExportParams 的参数描述如下：
+
+|    属性    |   类型   | 默认值 |               功能               |
+| :--------: | :------: | :----: | :------------------------------: |
+|  encoding  |  String  |  UTF8  |             文件编码             |
+| spiltMark  |  String  |   ,    |              分隔符              |
+|  textMark  |  String  |   “    | 字符串识别,可以去掉,需要前后一致 |
+| titleRows  |   int    |   0    |           表格头,忽略            |
+|  headRows  |   int    |   1    |               标题               |
+| exclusions | String[] |   0    |            忽略的字段            |
+
+
+
+
+
+
+
+```java
+package mao.java_report_easypoi_export_csv.service;
+
+import com.baomidou.mybatisplus.extension.service.IService;
+import mao.java_report_easypoi_export_csv.entity.User;
+
+/**
+ * Project name(项目名称)：java_report_easypoi_export_csv
+ * Package(包名): mao.java_report_easypoi_export_csv.service
+ * Interface(接口名): UserService
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2023/6/7
+ * Time(创建时间)： 14:32
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public interface UserService extends IService<User>
+{
+    /**
+     * 下载csv
+     */
+    void downloadCSV();
+}
+```
+
+
+
+```java
+package mao.java_report_easypoi_export_csv.service.impl;
+
+import cn.afterturn.easypoi.csv.CsvExportUtil;
+import cn.afterturn.easypoi.csv.entity.CsvExportParams;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import lombok.extern.slf4j.Slf4j;
+import mao.java_report_easypoi_export_csv.entity.User;
+import mao.java_report_easypoi_export_csv.mapper.UserMapper;
+import mao.java_report_easypoi_export_csv.service.UserService;
+import org.springframework.stereotype.Service;
+
+import java.io.FileOutputStream;
+import java.util.List;
+
+/**
+ * Project name(项目名称)：java_report_easypoi_export_csv
+ * Package(包名): mao.java_report_easypoi_export_csv.service.impl
+ * Class(类名): UserServiceImpl
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2023/6/7
+ * Time(创建时间)： 14:32
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+@Slf4j
+@Service
+public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService
+{
+
+    @Override
+    public void downloadCSV()
+    {
+        log.info("开始导出csv文件");
+        try (FileOutputStream fileOutputStream = new FileOutputStream("./out4.csv"))
+        {
+            //查询
+            List<User> userList = this.page(new Page<>(0, 10000)).getRecords();
+            CsvExportParams params = new CsvExportParams();
+            params.setEncoding(CsvExportParams.UTF8);
+            //表头
+            //params.setExclusions(new String[]{"编号", "姓名", "手机号", "入职日期", "地址"});
+            CsvExportUtil.exportCsv(params, User.class, userList, fileOutputStream);
+            log.info("csv文件导出完成");
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+
+
+
+
+```java
+package mao.java_report_easypoi_export_csv;
+
+import mao.java_report_easypoi_export_csv.service.UserService;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.ConfigurableApplicationContext;
+
+@SpringBootApplication
+public class JavaReportEasypoiExportCsvApplication
+{
+
+    public static void main(String[] args)
+    {
+        ConfigurableApplicationContext applicationContext =
+                SpringApplication.run(JavaReportEasypoiExportCsvApplication.class, args);
+        UserService userService = applicationContext.getBean(UserService.class);
+        userService.downloadCSV();
+    }
+
+}
+```
+
+
+
+
+
+效果：
+
+![image-20230607144304669](img/Java报表技术学习笔记/image-20230607144304669.png)
+
+
+
+![image-20230607144320807](img/Java报表技术学习笔记/image-20230607144320807.png)
+
+
+
+
+
+
+
+如果需要导出几百万数据时不可能全部加载到一个List中的，所以easyPOI的方式导出csv是支持不了太大的数据量的，如果导出几百万条数据还是得选择OpenCSV方式导出
+
+
+
+
+
+
+
+
+
+
+
+## 导出word
+
+使用easyPOI方式导出word文档，Word模板和Excel模板用法基本一致，支持的标签也是一致的，仅仅支持07版本的word也是只能生成后缀是docx的文档，poi对doc支持不好所以easyPOI中就没有支持doc
+
+
+
+EasyPoi支持的指令以及作用：
+
+```properties
+三元运算 {{test ? obj:obj2}}
+n: 表示 这个cell是数值类型 {{n:}}
+le: 代表长度{{le:()}} 在if/else 运用{{le:() > 8 ? obj1 : obj2}}
+fd: 格式化时间 {{fd:(obj;yyyy-MM-dd)}}
+fn: 格式化数字 {{fn:(obj;###.00)}}
+fe: 遍历数据,创建row
+!fe: 遍历数据不创建row
+$fe: 下移插入,把当前行,下面的行全部下移.size()行,然后插入
+#fe: 横向遍历
+v_fe: 横向遍历值
+!if: 删除当前列 {{!if:(test)}}
+单引号表示常量值 ‘’ 比如’1’ 那么输出的就是 1
+&NULL& 空格
+&INDEX& 表示循环中的序号,自动添加
+]] 换行符 多行遍历导出
+sum： 统计数据
+```
+
+
+
+
+
+准备一个模板：
+
+![image-20230607160607469](img/Java报表技术学习笔记/image-20230607160607469.png)
+
+
+
+
+
+![image-20230607160619207](img/Java报表技术学习笔记/image-20230607160619207.png)
+
+
+
+![image-20230607160628359](img/Java报表技术学习笔记/image-20230607160628359.png)
+
+
+
+![image-20230607160637479](img/Java报表技术学习笔记/image-20230607160637479.png)
+
+
+
+
+
+
+
+编写代码：
+
+```java
+package mao;
+
+import cn.afterturn.easypoi.word.WordExportUtil;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
+
+import java.io.FileOutputStream;
+import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Project name(项目名称)：java报表_EasyPOI导出word
+ * Package(包名): mao
+ * Class(类名): Test1
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2023/6/7
+ * Time(创建时间)： 15:15
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test1
+{
+    public static void main(String[] args) throws Exception
+    {
+        //数据
+        Map<String, Object> params = new HashMap<>();
+        params.put("name", "复杂模型计算机的设计");
+        params.put("class", "计算机科学与技术1班");
+        params.put("student_no", "123454678945");
+        params.put("student_name", "mao");
+        params.put("teacher_name", "张三");
+        params.put("date_year", LocalDate.now().getYear());
+        params.put("date_month", LocalDate.now().getMonthValue());
+        params.put("date_day", LocalDate.now().getDayOfMonth());
+        params.put("title_1", "课题的主要功能");
+        params.put("content_1", "本课题是.........");
+        params.put("title_2", "总体设计方案");
+        params.put("title_3", "数据格式和寻址方式的设计");
+        params.put("title_4", "指令和微程序的设计");
+        params.put("title_5", "线路连接图");
+        params.put("title_6", "微程序流程及说明");
+        params.put("title_7", "课程设计的收获及体会");
+        params.put("content_7", "计算机的教学是让学生学习电脑的使用方法，了解电脑对于我们学习和工作的重要性，" +
+                "以及利用不同的软件达到我们初始的目的。这其实也让我们通过不同的教学方式，不同的教学思维让学生对于电脑学习的兴趣，" +
+                "尤其是使用电脑并不仅仅只是来查资料或者是打游戏，还有其他很多很多的东西可以学习，" +
+                "我们要正确引导学生对于计算机的学习，让他们明白更多的学习方法以及计算机知识。\n" +
+                "\n" +
+                "　　计算机能够做的东西有很多，我们要用到的地方也很多，在这样的情况下，给同学们上好课，" +
+                "引起他们的兴趣，第一堂课很重要。第一次讲述计算机相关的内容，应该提前备好课，将文字和图片有机的结合到一起，" +
+                "将学习的内容尽可能的让其生动起来，勾起学生对计算机学习的兴趣。因为书本的上面的知识到底和计算机上面的画面不一样，" +
+                "学生对于动静结合的画面更加感兴趣一点，同时对于这样的知识也更加容易吸收一点，因此在之后的学习上也更加的期待。");
+        params.put("title_8", "参考资料");
+        params.put("content_8", "暂时无参考资料");
+
+        params.put("score", "100");
+
+        //写入
+        XWPFDocument xwpfDocument = WordExportUtil.exportWord07("./template.docx", params);
+        FileOutputStream fileOutputStream = new FileOutputStream("out.docx");
+        xwpfDocument.write(fileOutputStream);
+        xwpfDocument.close();
+        xwpfDocument.close();
+
+    }
+}
+```
+
+
+
+
+
+运行：
+
+![image-20230607160729706](img/Java报表技术学习笔记/image-20230607160729706.png)
+
+
+
+
+
+![image-20230607160742760](img/Java报表技术学习笔记/image-20230607160742760.png)
+
+
+
+![image-20230607160811618](img/Java报表技术学习笔记/image-20230607160811618.png)
+
+
+
+
+
+![image-20230607160822801](img/Java报表技术学习笔记/image-20230607160822801.png)
+
+
+
+
+
+
+
+准备一个表格模板：
+
+![image-20230607164122656](img/Java报表技术学习笔记/image-20230607164122656.png)
+
+
+
+
+
+
+
+代码：
+
+```java
+package mao;
+
+import cn.afterturn.easypoi.word.WordExportUtil;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
+
+import java.io.FileOutputStream;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Project name(项目名称)：java报表_EasyPOI导出word
+ * Package(包名): mao
+ * Class(类名): Test2
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2023/6/7
+ * Time(创建时间)： 16:14
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test2
+{
+    /**
+     * 得到int随机
+     *
+     * @param min 最小值
+     * @param max 最大值
+     * @return int
+     */
+    public static int getIntRandom(int min, int max)
+    {
+        if (min > max)
+        {
+            min = max;
+        }
+        return min + (int) (Math.random() * (max - min + 1));
+    }
+
+    public static void main(String[] args) throws Exception
+    {
+        //数据
+        Map<String, Object> params = new HashMap<>();
+        params.put("name", "员工信息表");
+
+        //下面是表格中需要的数据
+        List<Map<String, Object>> mapList = new ArrayList<>();
+        Map<String, Object> map = null;
+        for (int i = 1; i <= 180; i++)
+        {
+            map = new HashMap<>();
+            map.put("id", i);
+            map.put("name", "姓名" + i);
+            map.put("age", getIntRandom(15, 30));
+            map.put("address", "中国");
+            mapList.add(map);
+        }
+        //把组建好的表格需要的数据放到大map中
+        params.put("mapList", mapList);
+
+        params.put("date_year", LocalDate.now().getYear());
+        params.put("date_month", LocalDate.now().getMonthValue());
+        params.put("date_day", LocalDate.now().getDayOfMonth());
+
+        //写入
+        XWPFDocument xwpfDocument = WordExportUtil.exportWord07("./template2.docx", params);
+        FileOutputStream fileOutputStream = new FileOutputStream("out2.docx");
+        xwpfDocument.write(fileOutputStream);
+        xwpfDocument.close();
+        xwpfDocument.close();
+
+    }
+}
+```
+
+
+
+
+
+效果：
+
+![image-20230607164159637](img/Java报表技术学习笔记/image-20230607164159637.png)
+
+
+
+
+
+![image-20230607164212241](img/Java报表技术学习笔记/image-20230607164212241.png)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# PDF
+
